@@ -1,0 +1,40 @@
+{
+  "_note": "Hand-confirmed spellings. Left: the name as the live results feed writes it. Right: the same player's name in the archive. Each pair was checked by surname, country and playing history. Add a pair only when you are certain it is the same person; anything not listed here must reach 98% similarity by itself or the match is skipped.",
+  "ATP": {
+    "Daniel Merida": "Daniel Merida Aguilar",
+    "Aleksandr Shevchenko": "Alexander Shevchenko",
+    "SoonWoo Kwon": "Soon Woo Kwon",
+    "Joel Josef Schwaerzler": "Joel Schwaerzler",
+    "Abdullah Shelbayh": "Abedallah Shelbayh",
+    "SeongChan Hong": "Seong Chan Hong",
+    "Diego Dedura": "Diego Dedura Palomero"
+  },
+  "WTA": {
+    "Gabriela Knutson": "Gabriela Andrea Knutson",
+    "Catherine McNally": "Caty Mcnally",
+    "Irene Burillo": "Irene Burillo Escorihuela",
+    "Miriam Bulgaru": "Miriam Bianca Bulgaru",
+    "Anastasiia Sobolieva": "Anastasiya Soboleva",
+    "Yeonwoo Ku": "Yeon Woo Ku",
+    "Darya Khamutsianskaya": "Daria Khomutsianskaya",
+    "Caijsa Hennemann": "Caijsa Wilda Hennemann",
+    "Mimi Xu": "Mingge Xu",
+    "Aran Teixido Garcia": "Maria Aran Teixido Garcia",
+    "Giorgia Pedone": "Georgia Pedone",
+    "Amarissa Toth": "Amarissa Kiara Toth",
+    "Mariia Kozyreva": "Maria Kozyreva",
+    "Priska Nugroho": "Priska Madelyn Nugroho",
+    "Maria Herazo Gonzalez": "Maria Fernanda Herazo Gonzalez",
+    "Anna Rogers": "Anna Sinclair Rogers",
+    "Laura Bohner": "Laura Boehner",
+    "Emma Si Yu Dong": "Emma Dong",
+    "Iva Primorac Pavicic": "Iva Primorac",
+    "Yuriko Lily Miyazaki": "Yuriko Miyazaki",
+    "Ilinca Amariei": "Ilinca Dalina Amariei",
+    "Mell Reasco Gonzalez": "Mell Elizabeth Reasco Gonzalez",
+    "Adelina Lacinova": "Adelina Lachinova",
+    "Ranah Stoiber": "Ranah Akua Stoiber",
+    "Nadiia Kichenok": "Nadiya Kichenok",
+    "Maria Urrutia": "Maria Florencia Urrutia"
+  }
+}

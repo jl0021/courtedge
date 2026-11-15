@@ -42,7 +42,7 @@ PROB_CLIP = (0.005, 0.995)
 MATCH_COLUMNS = (
     "match_id, tour, season, tier, tourney_level, tourney_date, surface, best_of, outcome, "
     "winner_id, loser_id, winner_rank_points, loser_rank_points, "
-    "w_svpt, w_1stWon, w_2ndWon, l_svpt, l_1stWon, l_2ndWon"
+    "w_svpt, w_1stWon, w_2ndWon, l_svpt, l_1stWon, l_2ndWon, source"
 )
 
 
@@ -133,6 +133,7 @@ def walk_forward(matches: pd.DataFrame, params: ModelParams, engine: str = "anal
                 betas = fit_betas(np.array(fit_x), np.array(fit_y))
 
         w_pts, l_pts = _num(r.winner_rank_points), _num(r.loser_rank_points)
+        source = getattr(r, "source", "archive")
         if r.outcome != "W/O":
             a_is_winner = r.winner_id < r.loser_id
             if a_is_winner:
@@ -140,7 +141,7 @@ def walk_forward(matches: pd.DataFrame, params: ModelParams, engine: str = "anal
             else:
                 x, serve_total = model.features(r.loser_id, r.winner_id, r.surface, l_pts, w_pts)
             p3 = bo3_probability(x, betas)
-            use_sim = engine == "sim" and r.season in sim_seasons and r.tier in sim_tiers
+            use_sim = engine == "sim" and r.season in sim_seasons and r.tier in sim_tiers and source == "archive"
             if use_sim:
                 p_a_serve, p_b_serve = serve_inputs(p3, serve_total)
                 result = sim.simulate_match(
@@ -157,7 +158,7 @@ def walk_forward(matches: pd.DataFrame, params: ModelParams, engine: str = "anal
                 p_a = bo3_to_bo5(p3) if r.best_of == 5 else p3
             p_a = min(max(p_a, PROB_CLIP[0]), PROB_CLIP[1])
             out.append((r.match_id, r.season, r.tier, r.surface, r.best_of, r.outcome,
-                        p_a if a_is_winner else 1.0 - p_a, "sim" if use_sim else "analytic"))
+                        p_a if a_is_winner else 1.0 - p_a, "sim" if use_sim else "analytic", source))
             if r.tier == "tour" and r.best_of == 3:
                 fit_x.append(x)
                 fit_y.append(1.0 if a_is_winner else 0.0)
@@ -176,7 +177,7 @@ def walk_forward(matches: pd.DataFrame, params: ModelParams, engine: str = "anal
         betas = fit_betas(np.array(fit_x), np.array(fit_y))   # weights for predicting matches still to come
     model.betas = betas
     preds = pd.DataFrame(out, columns=["match_id", "season", "tier", "surface", "best_of", "outcome",
-                                       "p_winner", "engine"])
+                                       "p_winner", "engine", "source"])
     return preds, model
 
 
@@ -299,7 +300,9 @@ def run(db_path: Path = DEFAULT_DB, engine: str = "sim", tune: bool = False, n_t
         preds = pd.concat(frames, ignore_index=True)
 
         test = preds[preds["season"].isin(TEST_SEASONS)]
-        headline_set = test[test["tier"] == "tour"]
+        # The gate is scored on the archive only, so it stays fixed as new results arrive.
+        headline_set = test[(test["tier"] == "tour") & (test["source"] == "archive")]
+        live = preds[preds["source"] != "archive"]
         if headline_set.empty:
             raise RuntimeError("No tour-level 2025-2026 matches in the database. Run the ingest first.")
         brier = brier_score(headline_set["p_winner"])
@@ -327,8 +330,11 @@ def run(db_path: Path = DEFAULT_DB, engine: str = "sim", tune: bool = False, n_t
         "By tour and season": summarize(headline_set, ["tour", "season"]),
         "By surface": summarize(headline_set, ["surface"]),
         "Calibration of the favourite": calibration_table(headline_set["p_winner"]),
-        "Lower tier (qualifying, Challenger, ITF), 2025-2026, exact chain": summarize(test[test["tier"] == "lower"], ["tour"]),
+        "Lower tier (qualifying, Challenger, ITF), 2025-2026, exact chain":
+            summarize(test[(test["tier"] == "lower") & (test["source"] == "archive")], ["tour"]),
     }
+    if len(live):
+        tables["Results since the archive ended (not part of the gate), exact chain"] = summarize(live, ["tour", "tier"])
     for title, table in tables.items():
         print(f"\n{title}\n{table.to_string(index=False, float_format=lambda v: f'{v:.4f}')}")
     print(f"\nBrier {brier:.4f} (standard error {se:.4f}) on {len(headline_set):,} matches. "

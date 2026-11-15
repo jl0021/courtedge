@@ -39,6 +39,10 @@ There is no fixed ceiling on the number of legs. The 30% floor is what rules out
 
 - Match history is seeded from `Aneeshers/tennis-sackmann-archive`, seasons 2024–2026.
   The upstream `JeffSackmann/tennis_atp` returns 404 and must not be used.
+- Results after the archive ends (early June 2026) come from ESPN's public tennis scoreboard,
+  read-only. A match from that feed is stored only if both names pass the 98% lookup;
+  otherwise it is skipped and listed. Hand-confirmed spellings are in `config/name_aliases.json`.
+- The Milestone 1 gate is scored on archive matches only, so it does not move as new results arrive.
 - Kalshi tennis settlement: once one ball is played, a mid-match retirement (`RET`)
   resolves the advancing player as `Yes` and the retiring player as `No`.
   Walkovers (`W/O`) have no ball played and are excluded from model scoring.

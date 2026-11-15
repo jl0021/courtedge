@@ -105,7 +105,7 @@
   <header>
     <h1>CourtEdge <small id="datainfo">Read-only. Paper trades only.</small></h1>
     <div class="actions">
-      <button id="btn-update" title="Download the match files again and rebuild everything">Update data</button>
+      <button id="btn-update" title="Fetch results played since the last update, then refresh ratings, fatigue and veto flags">Update data</button>
       <button id="btn-fast" title="A few seconds. Same model, exact probabilities instead of sampling">Run fast backtest</button>
       <button id="btn-full" class="primary" title="About 8 minutes. The 10,000-trial simulator on every 2025–2026 match">Run full simulation</button>
     </div>
@@ -113,6 +113,7 @@
 
   <div id="jobbar" role="status"><span class="spinner"></span><span id="jobmsg"></span></div>
 
+  <div id="feednote" class="hint" style="display:none;color:var(--warn)"></div>
   <div class="cards" id="cards"></div>
 
   <nav role="tablist" aria-label="Sections">
@@ -145,7 +146,8 @@
       <label class="f" style="flex:1 1 200px">Search <input id="p-q" placeholder="Filter by name"></label>
     </div>
     <p class="hint">Top 100 by rating among players active in the last 12 months of data. "Vetoed" marks a player who lost
-      their last match by retirement or walkover, which blocks them from any combo.</p>
+      their last match by retirement or walkover, which blocks them from any combo. "Last 7 days" is the workload
+      up to today.</p>
     <div id="p-out"></div>
   </section>
 
@@ -198,9 +200,18 @@ async function refreshStatus() {
   let s;
   try { s = await api("/api/status"); } catch (e) { return; }
   limits = s.limits;
+  const job = s.job;
   if (s.data) $("datainfo").textContent =
-    `${int(s.data.matches)} matches, ${int(s.data.players)} players. Data from ${s.data.first} to ${s.data.last}. Read-only, paper trades only.`;
-  const job = s.job, bar = $("jobbar");
+    `${int(s.data.matches)} matches, current through ${s.data.last}` +
+    (s.data.live_matches ? ` (${int(s.data.live_matches)} from the live feed)` : " (archive only)") +
+    (s.data.skipped_matches ? `, ${int(s.data.skipped_matches)} skipped on name match` : "") + ". Read-only, paper trades only.";
+  const note = $("feednote"), cu = s.catch_up;
+  if (cu && cu.warning && job.state !== "running") {
+    note.style.display = "block";
+    note.textContent = `Could not reach the live results feed, so nothing new was added. Ratings are current through ${s.data ? s.data.last : "the archive"}.`;
+    note.title = cu.warning;
+  } else note.style.display = "none";
+  const bar = $("jobbar");
   const running = job.state === "running";
   ["btn-update", "btn-fast", "btn-full"].forEach((id) => $(id).disabled = running);
   bar.classList.toggle("show", running || job.state === "error");
@@ -274,9 +285,14 @@ async function loadPerformance() {
       <div><h2>By tour and season</h2>${table(cols([{ key: "tour", title: "Tour", left: true }, { key: "season", title: "Season" }]), t.by_season)}</div>
       <div><h2>By surface</h2>${table(cols([{ key: "surface", title: "Surface", left: true }]), t.by_surface)}</div>
     </div>
-    <h2>Lower tier, not part of the gate</h2>
-    <p class="hint">Qualifying, Challenger and ITF matches from 2025–2026. They feed the ratings but are scored separately.</p>
-    ${table(cols([{ key: "tour", title: "Tour", left: true }]), t.lower)}`;
+    <div class="grid2">
+      <div><h2>Since the archive ended, not part of the gate</h2>
+        <p class="hint">Results from the live feed after early June 2026. The model had never seen these when it was tuned.</p>
+        ${table(cols([{ key: "tour", title: "Tour", left: true }, { key: "tier", title: "Level", left: true }]), t.live)}</div>
+      <div><h2>Lower tier, not part of the gate</h2>
+        <p class="hint">Qualifying, Challenger and ITF matches from the archive, 2025–2026.</p>
+        ${table(cols([{ key: "tour", title: "Tour", left: true }]), t.lower)}</div>
+    </div>`;
 }
 
 /* ---------- matchup ---------- */
@@ -314,7 +330,8 @@ function sideCard(s, p) {
   return `<div class="side"><div class="name">${esc(s.name)} ${s.vetoed ? '<span class="pill flag">Vetoed</span>' : ""}</div>
     <div class="big">${pct(p)}</div>
     <div class="meta">Fair price ${Math.round(p * 100)}¢. Rating ${int(s.elo)}, on this surface ${int(s.surface_elo)} (${int(s.surface_matches)} matches).<br>
-      Wins ${pct(s.serve_point_prob)} of points on serve. Last played ${esc(s.last_date || "–")}${s.vetoed ? `, lost by ${esc(s.last_outcome)}` : ""}.</div></div>`;
+      Wins ${pct(s.serve_point_prob)} of points on serve. Last played ${esc(s.last_date || "–")}${s.vetoed ? `, lost by ${esc(s.last_outcome)}` : ""}.<br>
+      Last 7 days: ${s.load.matches_7d ? `${s.load.matches_7d} matches, ${s.load.sets_7d} sets, ${s.load.games_7d} games` : "no matches"}.</div></div>`;
 }
 $("m-run").onclick = async () => {
   const out = $("m-out");
@@ -359,6 +376,7 @@ async function loadPlayers() {
     { key: "matches_played", title: "Matches", fmt: int },
     { key: "serve_pts_won", title: "Serve points won", fmt: pct },
     { key: "return_pts_won", title: "Return points won", fmt: pct },
+    { title: "Last 7 days", html: (r) => r.matches_7d ? `${r.matches_7d} matches, ${r.sets_7d} sets` : "–" },
     { key: "last_tourney_date", title: "Last played" },
     { key: "last_outcome", title: "Last result", html: (r) => r.last_outcome === "COMPLETED" ? (r.last_match_won ? "Won" : "Lost")
         : `${r.last_match_won ? "Won" : "Lost"} by ${esc(r.last_outcome)}` },

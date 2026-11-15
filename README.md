@@ -8,7 +8,8 @@ markets and logs paper trades only. It never places orders. The locked rules are
 
 | Module | Purpose |
 |---|---|
-| `src/ingest.py` | Loads 2024–2026 ATP and WTA matches into `data/courtedge.db` and builds `player_lookup`. |
+| `src/ingest.py` | Loads 2024–2026 ATP and WTA matches into `data/courtedge.db`, builds `player_lookup`, then catches up to today. |
+| `src/espn_feed.py` | Read-only client for ESPN's public tennis scoreboard, used for the catch-up. |
 | `src/model.py` | Walk-forward ratings: Elo, surface Elo, ranking points, serve and return rates. |
 | `src/sim.py` | 10,000-trial point-by-point Markov simulator, plus the exact solution of the same chain. |
 | `src/risk_gate.py` | Locked leg and combo gate. |
@@ -36,7 +37,9 @@ run `sudo apt install -y python3-venv` once.
 - **Guardrails**: the locked values.
 - **Run fast backtest** takes a few seconds and uses exact probabilities from the same model.
   **Run full simulation** takes about 8 minutes, plays every 2025–2026 match 10,000 times,
-  and writes a note to `vault/Post_Mortems/`. **Update data** downloads the match files again.
+  and writes a note to `vault/Post_Mortems/`.
+- **Update data** fetches results played since the last update, then refreshes ratings, 7-day
+  workload and retirement/walkover flags. The dashboard also does this each time it opens.
 
 The dashboard never contacts Kalshi.
 
@@ -46,7 +49,8 @@ Inside the environment (`source .venv/bin/activate`):
 
 ```bash
 python -m src.server                      # the dashboard, same as ./start.sh
-python -m src.ingest                      # download the match files if missing and rebuild the database
+python -m src.ingest                      # load the archive, then catch up to today
+python -m src.ingest --catch-up           # only fetch results newer than what is stored
 python -m src.backtest --tune             # tune on the 2024 season only, then run the backtest
 python -m src.backtest                    # full simulator backtest with the saved parameters
 python -m src.backtest --engine analytic  # fast backtest
@@ -59,5 +63,12 @@ Each command-line run writes a note to `vault/Post_Mortems/`.
 
 ## Data
 
-Match data comes from [Aneeshers/tennis-sackmann-archive](https://github.com/Aneeshers/tennis-sackmann-archive),
+The seed comes from [Aneeshers/tennis-sackmann-archive](https://github.com/Aneeshers/tennis-sackmann-archive),
 a mirror of Jeff Sackmann's tennis datasets, licensed CC BY-NC-SA 4.0 (attribution, non-commercial, share-alike).
+It ends in early June 2026.
+
+Results after that come from ESPN's public tennis scoreboard. It is an undocumented endpoint, so it can
+change without notice. It covers ATP tour events and WTA events down to the 125 level, but not ATP
+Challengers, and it carries no surface, ranking points or serve statistics. A match is stored only when
+both player names resolve at 98% confidence; the rest are skipped and counted in the dashboard header.
+To fix a skipped name, add the feed's spelling to `config/name_aliases.json` and run **Update data** again.

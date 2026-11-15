@@ -1,0 +1,428 @@
+{
+ "events": [
+  {
+   "id": "415-2026",
+   "name": "Libéma Open",
+   "major": false,
+   "venue": {
+    "displayName": "'s-Hertogenbosch, Netherlands"
+   },
+   "date": "2026-06-06T04:00Z",
+   "groupings": [
+    {
+     "grouping": {
+      "slug": "mens-singles"
+     },
+     "competitions": [
+      {
+       "id": "179658",
+       "date": "2026-06-06T04:15Z",
+       "status": {
+        "type": {
+         "name": "STATUS_FINAL",
+         "completed": true
+        }
+       },
+       "round": {
+        "id": "11",
+        "displayName": "Qualifying 1st Round"
+       },
+       "notes": [
+        {
+         "text": "Benjamin Bonzi (FRA) bt Marc Polmans (AUS) 6-2 7-6 (7-3)",
+         "type": "event"
+        }
+       ],
+       "competitors": [
+        {
+         "winner": false,
+         "linescores": [
+          {
+           "value": 2.0,
+           "winner": false
+          },
+          {
+           "value": 6.0,
+           "tiebreak": 3,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "fullName": "Marc Polmans",
+          "displayName": "Marc Polmans"
+         }
+        },
+        {
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 7.0,
+           "tiebreak": 7,
+           "winner": true
+          }
+         ],
+         "athlete": {
+          "fullName": "Benjamin Bonzi",
+          "displayName": "Benjamin Bonzi"
+         }
+        }
+       ]
+      },
+      {
+       "id": "179659",
+       "date": "2026-06-06T09:00Z",
+       "status": {
+        "type": {
+         "name": "STATUS_FINAL",
+         "completed": true
+        }
+       },
+       "round": {
+        "id": "11",
+        "displayName": "Qualifying 1st Round"
+       },
+       "notes": [
+        {
+         "text": "Martin Damm (USA) bt Max Houkes (NED) 4-6 6-3 7-6 (7-4)",
+         "type": "event"
+        }
+       ],
+       "competitors": [
+        {
+         "winner": false,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 3.0,
+           "winner": false
+          },
+          {
+           "value": 6.0,
+           "tiebreak": 4,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "fullName": "Max Houkes",
+          "displayName": "Max Houkes"
+         }
+        },
+        {
+         "winner": true,
+         "linescores": [
+          {
+           "value": 4.0,
+           "winner": false
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 7.0,
+           "tiebreak": 7,
+           "winner": true
+          }
+         ],
+         "athlete": {
+          "fullName": "Martin Damm",
+          "displayName": "Martin Damm"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "grouping": {
+      "slug": "womens-singles"
+     },
+     "competitions": [
+      {
+       "id": "179621",
+       "date": "2026-06-06T09:05Z",
+       "status": {
+        "type": {
+         "name": "STATUS_FINAL",
+         "completed": true
+        }
+       },
+       "round": {
+        "id": "11",
+        "displayName": "Qualifying 1st Round"
+       },
+       "notes": [
+        {
+         "text": "Greet Minnen (BEL) bt Viktoriya Tomova (BUL) 6-1 6-1",
+         "type": "event"
+        }
+       ],
+       "competitors": [
+        {
+         "winner": false,
+         "linescores": [
+          {
+           "value": 1.0,
+           "winner": false
+          },
+          {
+           "value": 1.0,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "fullName": "Viktoriya Tomova",
+          "displayName": "Viktoriya Tomova"
+         }
+        },
+        {
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "athlete": {
+          "fullName": "Greet Minnen",
+          "displayName": "Greet Minnen"
+         }
+        }
+       ]
+      },
+      {
+       "id": "179619",
+       "date": "2026-06-06T09:10Z",
+       "status": {
+        "type": {
+         "name": "STATUS_FINAL",
+         "completed": true
+        }
+       },
+       "round": {
+        "id": "11",
+        "displayName": "Qualifying 1st Round"
+       },
+       "notes": [
+        {
+         "text": "Katie Volynets (USA) bt Nao Hibino (JPN) 6-2 6-2",
+         "type": "event"
+        }
+       ],
+       "competitors": [
+        {
+         "winner": false,
+         "linescores": [
+          {
+           "value": 2.0,
+           "winner": false
+          },
+          {
+           "value": 2.0,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "fullName": "Nao Hibino",
+          "displayName": "Nao Hibino"
+         }
+        },
+        {
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "winner": true
+          }
+         ],
+         "athlete": {
+          "fullName": "Katie Volynets",
+          "displayName": "Katie Volynets"
+         }
+        }
+       ]
+      },
+      {
+       "id": "177819",
+       "date": "2026-06-11T09:05Z",
+       "status": {
+        "type": {
+         "name": "STATUS_RETIRED",
+         "completed": true
+        }
+       },
+       "round": {
+        "id": "2",
+        "displayName": "Round 2"
+       },
+       "notes": [
+        {
+         "text": "Zeynep Sonmez (TUR) bt (5) Anastasia Potapova (AUT) 6-1 2-0 ret",
+         "type": "event"
+        }
+       ],
+       "competitors": [
+        {
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 2.0,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "fullName": "Zeynep Sonmez",
+          "displayName": "Zeynep Sonmez"
+         }
+        },
+        {
+         "winner": false,
+         "linescores": [
+          {
+           "value": 1.0,
+           "winner": false
+          },
+          {
+           "value": 0.0,
+           "winner": false
+          }
+         ],
+         "athlete": {
+          "fullName": "Anastasia Potapova",
+          "displayName": "Anastasia Potapova"
+         }
+        }
+       ]
+      },
+      {
+       "id": "177840",
+       "date": "2026-06-14T10:05Z",
+       "status": {
+        "type": {
+         "name": "STATUS_WALKOVER",
+         "completed": true
+        }
+       },
+       "round": {
+        "id": "7",
+        "displayName": "Final"
+       },
+       "notes": [
+        {
+         "text": "Robin Montgomery (USA) bt (8) Barbora Krejcikova (CZE) w/o",
+         "type": "event"
+        }
+       ],
+       "competitors": [
+        {
+         "winner": false,
+         "linescores": null,
+         "athlete": {
+          "fullName": "Barbora Krejcikova",
+          "displayName": "Barbora Krejcikova"
+         }
+        },
+        {
+         "winner": true,
+         "linescores": null,
+         "athlete": {
+          "fullName": "Robin Montgomery",
+          "displayName": "Robin Montgomery"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "grouping": {
+      "slug": "womens-doubles"
+     },
+     "competitions": [
+      {
+       "id": "177834",
+       "date": "2026-06-08T13:10Z",
+       "status": {
+        "type": {
+         "name": "STATUS_FINAL",
+         "completed": true
+        }
+       },
+       "round": {
+        "id": "1",
+        "displayName": "Round 1"
+       },
+       "notes": [
+        {
+         "text": "(4) Eri Hozumi (JPN) & Fang-Hsien Wu (TPO) bt Magali Kempen (BEL) & Qianhui Tang (CHN) 6-2 6-7 (5-7) 1-0 (11-9)",
+         "type": "event"
+        }
+       ],
+       "competitors": [
+        {
+         "winner": true,
+         "linescores": [
+          {
+           "value": 6.0,
+           "winner": true
+          },
+          {
+           "value": 6.0,
+           "tiebreak": 5,
+           "winner": false
+          },
+          {
+           "value": 1.0,
+           "tiebreak": 11,
+           "winner": true
+          }
+         ],
+         "athlete": null
+        },
+        {
+         "winner": false,
+         "linescores": [
+          {
+           "value": 2.0,
+           "winner": false
+          },
+          {
+           "value": 7.0,
+           "tiebreak": 7,
+           "winner": true
+          },
+          {
+           "value": 0.0,
+           "tiebreak": 9,
+           "winner": false
+          }
+         ],
+         "athlete": null
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

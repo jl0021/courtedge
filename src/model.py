@@ -127,8 +127,9 @@ class RatingModel:
         a, b = self._player(id_a, points_a), self._player(id_b, points_b)
         surf_a, surf_b = a.surf_elo.get(surface, a.elo), b.surf_elo.get(surface, b.elo)
         diff = (1 - p.w_surface) * (a.elo - b.elo) + p.w_surface * (surf_a - surf_b)
-        pts_a = points_a if points_a is not None and points_a > 0 else p.unranked_points
-        pts_b = points_b if points_b is not None and points_b > 0 else p.unranked_points
+        # Live results carry no ranking points, so fall back to the last value seen for the player.
+        pts_a = next((v for v in (points_a, a.last_points) if v is not None and v > 0), p.unranked_points)
+        pts_b = next((v for v in (points_b, b.last_points) if v is not None and v > 0), p.unranked_points)
         f_a, f_b = self.serve_expectations(a, b, surface)
         x = np.array([diff * LN10_OVER_400, math.log(pts_a + 10.0) - math.log(pts_b + 10.0), f_a - f_b])
         total = min(max(f_a + f_b, 1.05), 1.45)

@@ -1,7 +1,7 @@
 # CourtEdge MVP — Read-Only ATP & WTA Combo Prediction Engine
 
 ## Directory & Obsidian Vault Layout
-- `src/` — Python ingestion (`ingest.py`), 10k-trial point-by-point Markov simulator (`sim.py`), risk gate (`risk_gate.py`), read-only Kalshi market scanner (`kalshi_reader.py`), walk-forward backtest (`backtest.py`), and Obsidian Markdown writer (`vault_writer.py`).
+- `src/` — Python ingestion (`ingest.py`: archive seed plus live catch-up through `espn_feed.py`), 10k-trial point-by-point Markov simulator (`sim.py`), risk gate (`risk_gate.py`), read-only Kalshi market scanner (`kalshi_reader.py`), walk-forward backtest (`backtest.py`), and Obsidian Markdown writer (`vault_writer.py`).
 - `data/courtedge.db` — SQLite database storing surface-segmented telemetry, `player_lookup`, and paper-traded combos.
 - `vault/` — Active Obsidian Vault directory (all `.md` files here render live in Obsidian):
   - `vault/Hard_Guardrails.md` — Locked risk parameters (never modified automatically).
@@ -16,7 +16,9 @@
    - No arbitrary leg-count ceiling, **BUT every combo must have `fair_combo_prob >= 0.30` (minimum 30% chance to cash)** so a $10 bankroll ($1 flat unit) avoids long losing streaks.
    - Each individual leg must satisfy `simulated_prob - kalshi_ask >= 0.05` (+5%), and the joint combo probability must beat Kalshi's implied combo price by `>= +0.06` (+6%).
 3. **Data Sources & Settlement Rules:**
-   - Seed 2024–2026 ATP & WTA match history from `Aneeshers/tennis-sackmann-archive` (upstream `JeffSackmann/tennis_atp` returns 404—do not use it).
+   - Seed 2024–2026 ATP & WTA match history from `Aneeshers/tennis-sackmann-archive` (upstream `JeffSackmann/tennis_atp` returns 404—do not use it). The archive ends in early June 2026.
+   - Catch up from the end of the archive to today with ESPN's public tennis scoreboard (`GET` only, `src/espn_feed.py`). That feed has no surface, ranking points or serve stats: surface is taken from the archive's record of the same tournament (`Unknown` if none), ranking points keep their last known value, and serve/return rates keep their archive history. The Milestone 1 gate is scored on archive matches only.
+   - Hand-confirmed name spellings live in `config/name_aliases.json`. Add one only when certain it is the same player.
    - Enforce `>= 98%` player-name match confidence in `player_lookup` and veto any player who lost their last match by `RET` or `W/O` (the advancing winner is not vetoed).
    - Under Kalshi tennis rules, once 1 ball is played, mid-match retirements (`RET`) resolve the advancing winner as `Yes` and the retiring player as `No`.
 4. **Obsidian Formatting Standard:**

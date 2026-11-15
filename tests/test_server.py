@@ -38,6 +38,7 @@ def app(tmp_path_factory):
     application = server.App(db_path=root / "test.db", archive=root, write_vault=False)
     assert not application.has_data()
     assert application.status()["ready"] is False
+    application.fetch = lambda league, start, end: {"events": []}      # no network in tests
     assert application.start_job("setup")
     assert not application.start_job("backtest")            # one job at a time
     deadline = time.time() + 60

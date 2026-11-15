@@ -33,7 +33,8 @@ ACTIVE_WINDOW_DAYS = 365
 
 JOBS = {
     "setup": "Loading match data and running the backtest",
-    "update": "Re-downloading match data and running the backtest",
+    "update": "Fetching new results and updating ratings",
+    "startup": "Checking for new results",
     "backtest": "Running the fast backtest",
     "backtest-full": "Running the 10,000-trial simulator backtest",
 }
@@ -51,6 +52,8 @@ class App:
         self.job = {"name": None, "state": "idle", "message": "", "started": None, "finished": None}
         self._models = None
         self._performance_cache: tuple[str, dict] | None = None
+        self.last_catch_up: dict | None = None
+        self.fetch = None            # tests replace the live feed with a stub
 
     # ---- database helpers ----
     def connect(self) -> sqlite3.Connection:
@@ -99,10 +102,24 @@ class App:
 
     def _run_job(self, name: str) -> None:
         try:
-            if name in ("setup", "update"):
-                summary = ingest.ingest(self.archive, self.db_path, force_download=(name == "update"), log=self._say)
+            if name == "setup":
+                summary = ingest.ingest(self.archive, self.db_path, log=self._say)
+                self._say(f"Loaded {summary['matches']:,} archive matches. Fetching newer results")
+            if name in ("setup", "update", "startup"):
                 self._models = None
-                self._say(f"Loaded {summary['matches']:,} matches. Running the backtest")
+                kwargs = {"fetch": self.fetch} if self.fetch else {}
+                try:
+                    result = ingest.catch_up(self.db_path, log=self._say, **kwargs)
+                    self.last_catch_up = {k: result[k] for k in (
+                        "added", "in_archive", "already_stored", "unmatched", "unknown_surface", "through")}
+                    self.last_catch_up["unmatched_names"] = [
+                        {"matches": count, "tour": tour, "name": player} for count, tour, player in result["unmatched_names"]]
+                    self.last_catch_up["warning"] = result["errors"][0] if result["errors"] else None
+                except ConnectionError as exc:
+                    if name == "update":
+                        raise
+                    self.last_catch_up = {"warning": str(exc)}     # first run offline: continue on the archive alone
+                self._say("Updating ratings and running the backtest")
             if name == "backtest-full":
                 with self.connect() as conn:
                     total = conn.execute(
@@ -121,7 +138,7 @@ class App:
     # ---- API payloads ----
     def status(self) -> dict:
         payload = {
-            "ready": False, "data": None, "run": None, "job": dict(self.job),
+            "ready": False, "data": None, "run": None, "job": dict(self.job), "catch_up": self.last_catch_up,
             "limits": {"brier": risk_gate.MAX_BRIER_SCORE, "calibration_gap": risk_gate.MAX_CALIBRATION_GAP},
         }
         if self.job["started"]:
@@ -131,7 +148,10 @@ class App:
         with self.connect() as conn:
             row = conn.execute("SELECT COUNT(*), MIN(tourney_date), MAX(tourney_date) FROM matches").fetchone()
             players = conn.execute("SELECT COUNT(*) FROM players").fetchone()[0]
-            payload["data"] = {"matches": row[0], "first": row[1], "last": row[2], "players": players}
+            live = conn.execute("SELECT COUNT(*) FROM matches WHERE source != 'archive'").fetchone()[0]
+            skipped = conn.execute("SELECT COUNT(DISTINCT match_id) FROM ingest_unmatched").fetchone()[0]
+            payload["data"] = {"matches": row[0], "first": row[1], "last": row[2], "players": players,
+                               "live_matches": live, "skipped_matches": skipped}
             payload["run"] = self.latest_run(conn)
         payload["ready"] = payload["run"] is not None
         return payload
@@ -144,10 +164,12 @@ class App:
             if self._performance_cache and self._performance_cache[0] == run["run_id"]:
                 return self._performance_cache[1]
             preds = pd.read_sql_query(
-                "SELECT p.p_winner, m.tour, m.season, m.tier, m.surface FROM predictions p "
+                "SELECT p.p_winner, m.tour, m.season, m.tier, m.surface, m.source FROM predictions p "
                 "JOIN matches m USING (match_id) WHERE p.run_id = ? AND m.season >= 2025", conn, params=[run["run_id"]])
-        head = preds[preds["tier"] == "tour"]
-        lower = preds[preds["tier"] == "lower"]
+        archive = preds[preds["source"] == "archive"]
+        live = preds[preds["source"] != "archive"]
+        head = archive[archive["tier"] == "tour"]
+        lower = archive[archive["tier"] == "lower"]
 
         def records(frame: pd.DataFrame) -> list[dict]:
             return json.loads(frame.to_json(orient="records"))
@@ -158,6 +180,7 @@ class App:
             "by_surface": records(backtest.summarize(head, ["surface"])),
             "calibration": records(backtest.calibration_table(head["p_winner"])),
             "lower": records(backtest.summarize(lower, ["tour"])) if len(lower) else [],
+            "live": records(backtest.summarize(live, ["tour", "tier"])) if len(live) else [],
         }
         payload = {"run": run, "tables": tables}
         self._performance_cache = (run["run_id"], payload)
@@ -173,9 +196,12 @@ class App:
             rows = conn.execute(
                 "SELECT s.player_id, p.full_name, p.ioc, s.matches_played, s.elo, s.serve_pts_won, s.return_pts_won, "
                 "s.last_tourney_date, s.last_outcome, s.last_match_won, "
+                "COALESCE(st.matches_7d, 0) AS matches_7d, COALESCE(st.sets_7d, 0) AS sets_7d, "
+                "COALESCE(st.games_7d, 0) AS games_7d, "
                 "(SELECT COUNT(*) + 1 FROM player_surface_stats o WHERE o.tour = s.tour AND o.surface = s.surface "
                 "   AND o.matches_played >= ? AND o.last_tourney_date >= ? AND o.elo > s.elo) AS position "
                 "FROM player_surface_stats s JOIN players p ON p.tour = s.tour AND p.player_id = s.player_id "
+                "LEFT JOIN player_status st ON st.tour = s.tour AND st.player_id = s.player_id "
                 "WHERE s.tour = ? AND s.surface = ? AND s.matches_played >= ? AND s.last_tourney_date >= ? "
                 "AND p.full_name LIKE ? ORDER BY s.elo DESC LIMIT ?",
                 (min_matches, cutoff, tour, surface, min_matches, cutoff, f"%{query}%", limit)).fetchall()
@@ -229,6 +255,9 @@ class App:
             names = dict(conn.execute(
                 "SELECT player_id, full_name FROM players WHERE tour = ? AND player_id IN (?, ?)",
                 (tour, id_a, id_b)).fetchall())
+            load = {row[0]: {"matches_7d": row[1], "sets_7d": row[2], "games_7d": row[3]} for row in conn.execute(
+                "SELECT player_id, matches_7d, sets_7d, games_7d FROM player_status WHERE tour = ? AND player_id IN (?, ?)",
+                (tour, id_a, id_b))}
 
         def side(player_id: int, state, serve: float) -> dict:
             return {
@@ -236,6 +265,7 @@ class App:
                 "elo": round(state.elo), "surface_elo": round(state.surf_elo.get(surface, state.elo)),
                 "matches": state.n, "surface_matches": state.surf_n.get(surface, 0),
                 "serve_point_prob": serve, "last_date": state.last_date, "last_outcome": state.last_outcome,
+                "load": load.get(player_id, {"matches_7d": 0, "sets_7d": 0, "games_7d": 0}),
                 "vetoed": risk_gate.is_vetoed_by_last_result(state.last_outcome, state.last_won),
             }
 
@@ -336,8 +366,8 @@ def serve(port: int = DEFAULT_PORT, open_browser: bool = True, app: App | None =
     address = f"http://127.0.0.1:{httpd.server_address[1]}"
     if not app.has_data():
         app.start_job("setup")
-    elif app.status()["run"] is None:
-        app.start_job("backtest")
+    else:
+        app.start_job("startup")     # pull anything new each time the dashboard opens
     print(f"CourtEdge dashboard: {address}  (Ctrl+C to stop)")
     if open_browser:
         threading.Timer(0.5, lambda: webbrowser.open(address)).start()
