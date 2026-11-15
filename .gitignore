@@ -5,3 +5,5 @@ __pycache__/
 data/*.db
 data/*.sqlite*
 vault/.obsidian/workspace*.json
+
+data/raw/

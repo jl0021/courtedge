@@ -1,0 +1,32 @@
+{
+  "tuned_on_season": 2024,
+  "scored_from": "2024-03-01",
+  "tuning_brier": {
+    "ATP": 0.21750057414913956,
+    "WTA": 0.2152237617817141
+  },
+  "params": {
+    "ATP": {
+      "k0": 300.0,
+      "k_offset": 5.0,
+      "k_shape": 0.5,
+      "w_surface": 0.7,
+      "init_slope": 200.0,
+      "unranked_points": 15.0,
+      "ret_weight": 0.5,
+      "stats_decay": 0.97,
+      "stats_prior_pts": 400.0
+    },
+    "WTA": {
+      "k0": 300.0,
+      "k_offset": 5.0,
+      "k_shape": 0.5,
+      "w_surface": 0.3,
+      "init_slope": 200.0,
+      "unranked_points": 15.0,
+      "ret_weight": 0.5,
+      "stats_decay": 0.97,
+      "stats_prior_pts": 400.0
+    }
+  }
+}
