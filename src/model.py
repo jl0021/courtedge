@@ -42,7 +42,8 @@ class ModelParams:
 
 
 class PlayerState:
-    __slots__ = ("elo", "n", "surf_elo", "surf_n", "serve", "ret", "last_outcome", "last_won", "last_date")
+    __slots__ = ("elo", "n", "surf_elo", "surf_n", "serve", "ret", "last_outcome", "last_won", "last_date",
+                 "last_points")
 
     def __init__(self, elo: float):
         self.elo = elo
@@ -54,6 +55,7 @@ class PlayerState:
         self.last_outcome: str | None = None
         self.last_won: bool | None = None         # whether the player won (advanced from) that match
         self.last_date: str | None = None
+        self.last_points: float | None = None     # ranking points listed at the player's most recent match
 
 
 def _sigmoid(z: float) -> float:
@@ -83,6 +85,7 @@ class RatingModel:
     def __init__(self, params: ModelParams = ModelParams()):
         self.params = params
         self.players: dict[int, PlayerState] = {}
+        self.betas = np.array([1.0, 0.0, 0.0])        # blend weights, set by the walk-forward
         self.tour_serve: dict[str, list[float]] = {}   # surface -> [serve points won, serve points played]
 
     # ---- state access ----
@@ -141,6 +144,10 @@ class RatingModel:
         w, l = self._player(winner_id, winner_points), self._player(loser_id, loser_points)
         w.last_outcome = l.last_outcome = outcome
         w.last_won, l.last_won = True, False
+        if winner_points is not None:
+            w.last_points = winner_points
+        if loser_points is not None:
+            l.last_points = loser_points
         w.last_date = l.last_date = tourney_date
         if outcome == "W/O":
             return  # no ball was played, so there is nothing to learn about form

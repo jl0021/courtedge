@@ -121,3 +121,40 @@ def test_lookup_confidence_floor_is_enforced_by_schema(db):
 def test_forbidden_upstream_is_refused(tmp_path):
     with pytest.raises(ValueError):
         ingest.ensure_archive(tmp_path / "JeffSackmann" / "tennis_atp")
+
+
+def test_required_files_and_no_download_for_a_supplied_archive(archive, monkeypatch):
+    files = ingest.required_files()
+    assert len(files) == 14 and "atp/atp_matches_2025.csv" in files and "wta/wta_players.csv" in files
+    assert not any("futures" in f for f in files)
+
+    def no_network(*args, **kwargs):
+        raise AssertionError("a supplied archive must not trigger a download")
+    monkeypatch.setattr(ingest.urllib.request, "urlopen", no_network)
+    assert ingest.ensure_archive(archive) == archive
+    with pytest.raises(FileNotFoundError):
+        ingest.ensure_archive(archive / "missing")
+
+
+def test_managed_archive_downloads_only_missing_files(tmp_path, monkeypatch):
+    target = tmp_path / "raw"
+    monkeypatch.setattr(ingest, "DEFAULT_ARCHIVE", target)
+    (target / "atp").mkdir(parents=True)
+    (target / "atp" / "atp_players.csv").write_text("already here\n")
+    requested = []
+
+    class FakeResponse:
+        def __init__(self, url): self.url = url
+        def __enter__(self): return self
+        def __exit__(self, *exc): return False
+        def read(self): return b"x\n"
+
+    def fake_urlopen(url, timeout=None):
+        assert url.startswith("https://raw.githubusercontent.com/Aneeshers/tennis-sackmann-archive/")
+        requested.append(url)
+        return FakeResponse(url)
+    monkeypatch.setattr(ingest.urllib.request, "urlopen", fake_urlopen)
+    ingest.ensure_archive(target, log=lambda message: None)
+    assert len(requested) == 13
+    assert (target / "atp" / "atp_players.csv").read_text() == "already here\n"
+    assert all((target / rel).exists() for rel in ingest.required_files())

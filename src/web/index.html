@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CourtEdge</title>
+<style>
+  :root {
+    --bg: #f4f5f1; --panel: #ffffff; --ink: #14201b; --muted: #5d6b64; --line: #dfe3dc;
+    --accent: #1f6f4a; --accent-ink: #ffffff; --accent-soft: #e3f1e9;
+    --good: #1f7a4d; --good-soft: #dff3e7; --bad: #b3372b; --bad-soft: #fbe5e2; --warn: #8a6100; --warn-soft: #fbf0cf;
+    --bar: #2f8f63; --bar-b: #8b97a8; --band: rgba(31,111,74,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1613; --panel: #18211d; --ink: #e9efe9; --muted: #9aa8a0; --line: #2a362f;
+      --accent: #5fce94; --accent-ink: #0c1a13; --accent-soft: #1d3327;
+      --good: #6fdca0; --good-soft: #17382a; --bad: #ff8a7c; --bad-soft: #43201c; --warn: #f1c453; --warn-soft: #3a2f10;
+      --bar: #5fce94; --bar-b: #71809a; --band: rgba(95,206,148,.14);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px 56px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 20px 0 14px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+  h1 small { display: block; font-size: 12.5px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+  .actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+           padding: 7px 13px; border-radius: 8px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button:focus-visible, input:focus-visible, select:focus-visible, [role=tab]:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; }
+  #jobbar { display: none; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px;
+            background: var(--warn-soft); color: var(--warn); font-size: 14px; }
+  #jobbar.error { background: var(--bad-soft); color: var(--bad); }
+  #jobbar.show { display: flex; }
+  .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
+             border-radius: 50%; animation: spin .8s linear infinite; flex: none; }
+  #jobbar.error .spinner { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card .label { font-size: 12.5px; color: var(--muted); }
+  .card .value { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.25; }
+  .card .note { font-size: 12.5px; color: var(--muted); }
+  .pill { display: inline-block; font-size: 12px; font-weight: 650; padding: 2px 9px; border-radius: 99px; vertical-align: middle; }
+  .pill.pass { background: var(--good-soft); color: var(--good); }
+  .pill.fail { background: var(--bad-soft); color: var(--bad); }
+  .pill.flag { background: var(--warn-soft); color: var(--warn); }
+  nav[role=tablist] { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; overflow-x: auto; }
+  [role=tab] { border: 0; background: none; border-radius: 0; padding: 9px 14px; color: var(--muted);
+               border-bottom: 2px solid transparent; white-space: nowrap; }
+  [role=tab][aria-selected=true] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+  section[role=tabpanel] { display: none; }
+  section[role=tabpanel].on { display: block; }
+  h2 { font-size: 15px; margin: 22px 0 8px; }
+  h2:first-child { margin-top: 0; }
+  p.hint { color: var(--muted); font-size: 13.5px; margin: 4px 0 12px; max-width: 70ch; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px 24px; }
+  .tablewrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 14px; }
+  th, td { padding: 7px 12px; text-align: right; white-space: nowrap; }
+  th { font-size: 12px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); }
+  td { border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: 0; }
+  th:first-child, td:first-child, th.l, td.l { text-align: left; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: end; margin-bottom: 14px; }
+  label.f { display: grid; gap: 3px; font-size: 12.5px; color: var(--muted); }
+  input, select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+                  border-radius: 8px; padding: 7px 10px; min-width: 0; }
+  .pick { position: relative; flex: 1 1 220px; }
+  .pick input { width: 100%; }
+  .suggest { position: absolute; z-index: 5; left: 0; right: 0; top: 100%; margin-top: 4px; background: var(--panel);
+             border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: none;
+             box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .suggest.show { display: block; }
+  .suggest div { padding: 7px 10px; cursor: pointer; }
+  .suggest div:hover, .suggest div.hl { background: var(--accent-soft); }
+  .suggest span { color: var(--muted); font-size: 12.5px; margin-left: 6px; }
+  .versus { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 6px 0 10px; }
+  .side { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .side .name { font-weight: 650; }
+  .side .big { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .side .meta { color: var(--muted); font-size: 13px; }
+  .split { display: flex; height: 10px; border-radius: 99px; overflow: hidden; margin: 2px 0 16px; background: var(--bar-b); }
+  .split i { background: var(--bar); }
+  .bars { display: grid; gap: 6px; }
+  .barrow { display: grid; grid-template-columns: 54px 1fr 52px; gap: 8px; align-items: center; font-size: 13.5px;
+            font-variant-numeric: tabular-nums; }
+  .barrow .track { height: 14px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .barrow .track i { display: block; height: 100%; background: var(--bar); }
+  .barrow .track i.b { background: var(--bar-b); }
+  .barrow b { font-weight: 500; text-align: right; }
+  svg text { fill: var(--muted); font-size: 11px; }
+  .empty { color: var(--muted); padding: 28px 0; text-align: center; }
+  @media (max-width: 560px) { .versus { grid-template-columns: 1fr; } .actions { margin-left: 0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>CourtEdge <small id="datainfo">Read-only. Paper trades only.</small></h1>
+    <div class="actions">
+      <button id="btn-update" title="Download the match files again and rebuild everything">Update data</button>
+      <button id="btn-fast" title="A few seconds. Same model, exact probabilities instead of sampling">Run fast backtest</button>
+      <button id="btn-full" class="primary" title="About 8 minutes. The 10,000-trial simulator on every 2025–2026 match">Run full simulation</button>
+    </div>
+  </header>
+
+  <div id="jobbar" role="status"><span class="spinner"></span><span id="jobmsg"></span></div>
+
+  <div class="cards" id="cards"></div>
+
+  <nav role="tablist" aria-label="Sections">
+    <button role="tab" aria-selected="true" data-tab="performance">Performance</button>
+    <button role="tab" aria-selected="false" data-tab="matchup">Matchup simulator</button>
+    <button role="tab" aria-selected="false" data-tab="players">Players</button>
+    <button role="tab" aria-selected="false" data-tab="guardrails">Guardrails</button>
+  </nav>
+
+  <section role="tabpanel" id="performance" class="on"></section>
+
+  <section role="tabpanel" id="matchup">
+    <p class="hint">Pick two players. The model sets each player's chance of winning a point on serve from their ratings,
+      then plays the match 10,000 times, point by point. Ratings are as of the last match in the data.</p>
+    <div class="controls">
+      <label class="f">Tour <select id="m-tour"><option>ATP</option><option>WTA</option></select></label>
+      <label class="f pick">Player A <input id="m-a" autocomplete="off" placeholder="Type a name"><div class="suggest" id="m-a-s"></div></label>
+      <label class="f pick">Player B <input id="m-b" autocomplete="off" placeholder="Type a name"><div class="suggest" id="m-b-s"></div></label>
+      <label class="f">Surface <select id="m-surface"><option>Hard</option><option>Clay</option><option>Grass</option></select></label>
+      <label class="f">Format <select id="m-bo"><option value="3">Best of 3</option><option value="5">Best of 5</option></select></label>
+      <button id="m-run" class="primary">Simulate</button>
+    </div>
+    <div id="m-out"><div class="empty">No simulation yet.</div></div>
+  </section>
+
+  <section role="tabpanel" id="players">
+    <div class="controls">
+      <label class="f">Tour <select id="p-tour"><option>ATP</option><option>WTA</option></select></label>
+      <label class="f">Surface <select id="p-surface"><option>All</option><option>Hard</option><option>Clay</option><option>Grass</option></select></label>
+      <label class="f" style="flex:1 1 200px">Search <input id="p-q" placeholder="Filter by name"></label>
+    </div>
+    <p class="hint">Top 100 by rating among players active in the last 12 months of data. "Vetoed" marks a player who lost
+      their last match by retirement or walkover, which blocks them from any combo.</p>
+    <div id="p-out"></div>
+  </section>
+
+  <section role="tabpanel" id="guardrails"></section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pct = (v, d = 1) => v == null ? "–" : (v * 100).toFixed(d) + "%";
+const num = (v, d = 4) => v == null ? "–" : Number(v).toFixed(d);
+const int = (v) => v == null ? "–" : Number(v).toLocaleString();
+const pill = (ok) => `<span class="pill ${ok ? "pass" : "fail"}">${ok ? "Pass" : "Fail"}</span>`;
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok && res.status !== 409) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function table(columns, rows) {
+  if (!rows.length) return '<div class="empty">Nothing to show.</div>';
+  const head = columns.map((c) => `<th class="${c.left ? "l" : ""}">${esc(c.title)}</th>`).join("");
+  const body = rows.map((r) => "<tr>" + columns.map((c) =>
+    `<td class="${c.left ? "l" : ""}">${c.html ? c.html(r) : esc(c.fmt ? c.fmt(r[c.key]) : r[c.key])}</td>`).join("") + "</tr>").join("");
+  return `<div class="tablewrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+/* ---------- status, cards, jobs ---------- */
+let lastRunId = null, lastJobState = null, limits = { brier: 0.215, calibration_gap: 0.035 };
+
+function renderCards(s) {
+  const run = s.run;
+  if (!run) { $("cards").innerHTML = '<div class="card"><div class="label">Status</div><div class="note">Setting up. Results appear here when the first backtest finishes.</div></div>'; return; }
+  const engine = run.engine === "sim" ? "10,000-trial simulator" : "Fast run (exact probabilities)";
+  $("cards").innerHTML = `
+    <div class="card"><div class="label">Milestone 1 gate ${pill(run.passed)}</div>
+      <div class="value">${run.passed ? "Passed" : "Not passed"}</div><div class="note">${esc(engine)}</div></div>
+    <div class="card"><div class="label">Brier score ${pill(run.brier_passed)}</div>
+      <div class="value">${num(run.brier)}</div><div class="note">Must be below ${limits.brier}. Lower is better.</div></div>
+    <div class="card"><div class="label">Largest calibration gap ${pill(run.calibration_passed)}</div>
+      <div class="value">${pct(run.max_calibration_gap)}</div><div class="note">Limit ${pct(limits.calibration_gap)} in every bucket.</div></div>
+    <div class="card"><div class="label">Favourite won</div>
+      <div class="value">${pct(run.accuracy)}</div><div class="note">${int(run.n_matches)} tour-level matches, 2025–2026.</div></div>`;
+}
+
+async function refreshStatus() {
+  let s;
+  try { s = await api("/api/status"); } catch (e) { return; }
+  limits = s.limits;
+  if (s.data) $("datainfo").textContent =
+    `${int(s.data.matches)} matches, ${int(s.data.players)} players. Data from ${s.data.first} to ${s.data.last}. Read-only, paper trades only.`;
+  const job = s.job, bar = $("jobbar");
+  const running = job.state === "running";
+  ["btn-update", "btn-fast", "btn-full"].forEach((id) => $(id).disabled = running);
+  bar.classList.toggle("show", running || job.state === "error");
+  bar.classList.toggle("error", job.state === "error");
+  if (running) $("jobmsg").textContent = `${job.message}… (${Math.round(job.elapsed || 0)}s)`;
+  if (job.state === "error") $("jobmsg").textContent = `That did not finish: ${job.message}`;
+  renderCards(s);
+  const runId = s.run ? s.run.run_id : null;
+  if (runId !== lastRunId || (lastJobState === "running" && job.state === "done")) {
+    lastRunId = runId;
+    loadPerformance(); loadPlayers();
+  }
+  lastJobState = job.state;
+}
+
+async function startJob(name) {
+  try { await api("/api/jobs/" + name, {}); } catch (e) { alertBar(e.message); }
+  refreshStatus();
+}
+function alertBar(message) { const bar = $("jobbar"); bar.classList.add("show", "error"); $("jobmsg").textContent = message; }
+$("btn-update").onclick = () => startJob("update");
+$("btn-fast").onclick = () => startJob("backtest");
+$("btn-full").onclick = () => startJob("backtest-full");
+
+/* ---------- performance ---------- */
+function calibrationChart(rows) {
+  const W = 420, H = 300, m = { l: 44, r: 30, t: 12, b: 36 }, lo = 0.5, hi = 1.0;
+  const x = (v) => m.l + (v - lo) / (hi - lo) * (W - m.l - m.r);
+  const y = (v) => H - m.b - (v - lo) / (hi - lo) * (H - m.t - m.b);
+  const g = limits.calibration_gap;
+  const band = `M${x(lo)},${y(lo + g)} L${x(hi - g)},${y(hi)} L${x(hi)},${y(hi)} L${x(hi)},${y(hi - g)} L${x(lo + g)},${y(lo)} L${x(lo)},${y(lo)} Z`;
+  let ticks = "";
+  for (let v = 0.5; v <= 1.0001; v += 0.1) {
+    ticks += `<line x1="${x(v)}" y1="${y(lo)}" x2="${x(v)}" y2="${y(hi)}" stroke="var(--line)"/>
+              <line x1="${x(lo)}" y1="${y(v)}" x2="${x(hi)}" y2="${y(v)}" stroke="var(--line)"/>
+              <text x="${x(v)}" y="${H - m.b + 15}" text-anchor="middle">${Math.round(v * 100)}%</text>
+              <text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${Math.round(v * 100)}%</text>`;
+  }
+  const pts = rows.map((r) => `${x(r.predicted)},${y(r.actual)}`).join(" ");
+  const dots = rows.map((r) => `<circle cx="${x(r.predicted)}" cy="${y(r.actual)}" r="4.5" fill="var(--bar)">
+      <title>Predicted ${pct(r.predicted)}, actual ${pct(r.actual)} (${int(r.n)} matches)</title></circle>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Calibration chart: predicted against actual win rate of the favourite">
+    ${ticks}<path d="${band}" fill="var(--band)"/>
+    <line x1="${x(lo)}" y1="${y(lo)}" x2="${x(hi)}" y2="${y(hi)}" stroke="var(--muted)" stroke-dasharray="4 4"/>
+    <polyline points="${pts}" fill="none" stroke="var(--bar)" stroke-width="2"/>${dots}
+    <text x="${(W + m.l) / 2}" y="${H - 4}" text-anchor="middle">Predicted win rate of the favourite</text>
+    <text transform="translate(11 ${(H - m.b) / 2 + 10}) rotate(-90)" text-anchor="middle">Actual win rate</text></svg>`;
+}
+
+async function loadPerformance() {
+  const el = $("performance");
+  let d;
+  try { d = await api("/api/performance"); } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (!d.run) { el.innerHTML = '<div class="empty">No backtest yet.</div>'; return; }
+  const t = d.tables;
+  const cols = (first) => [...first, { key: "n", title: "Matches", fmt: int }, { key: "brier", title: "Brier", fmt: num },
+    { key: "accuracy", title: "Favourite won", fmt: pct }];
+  el.innerHTML = `
+    <div class="grid2">
+      <div><h2>Calibration</h2>
+        <p class="hint">Each dot is one probability bucket. On the dashed line, predictions match results exactly. The shaded band is the allowed ±${pct(limits.calibration_gap)}.</p>
+        <div class="card">${calibrationChart(t.calibration)}</div></div>
+      <div><h2>Calibration by bucket</h2>
+        <p class="hint">A positive gap means favourites won more often than the model predicted.</p>
+        ${table([{ key: "band", title: "Favourite's predicted chance", left: true }, { key: "n", title: "Matches", fmt: int },
+          { key: "predicted", title: "Predicted", fmt: pct }, { key: "actual", title: "Actual", fmt: pct },
+          { title: "Gap", html: (r) => `${r.gap >= 0 ? "+" : ""}${(r.gap * 100).toFixed(1)}% ${Math.abs(r.gap) <= limits.calibration_gap ? "" : '<span class="pill fail">Over</span>'}` }], t.calibration)}
+        <h2>By tour</h2>${table(cols([{ key: "tour", title: "Tour", left: true }]), t.by_tour)}</div>
+    </div>
+    <div class="grid2">
+      <div><h2>By tour and season</h2>${table(cols([{ key: "tour", title: "Tour", left: true }, { key: "season", title: "Season" }]), t.by_season)}</div>
+      <div><h2>By surface</h2>${table(cols([{ key: "surface", title: "Surface", left: true }]), t.by_surface)}</div>
+    </div>
+    <h2>Lower tier, not part of the gate</h2>
+    <p class="hint">Qualifying, Challenger and ITF matches from 2025–2026. They feed the ratings but are scored separately.</p>
+    ${table(cols([{ key: "tour", title: "Tour", left: true }]), t.lower)}`;
+}
+
+/* ---------- matchup ---------- */
+const picked = { a: null, b: null };
+function wirePicker(key) {
+  const input = $("m-" + key), box = $("m-" + key + "-s");
+  let timer = null, items = [], hl = -1;
+  const close = () => { box.classList.remove("show"); hl = -1; };
+  const choose = (item) => { picked[key] = item; input.value = item.full_name; close(); };
+  const draw = () => {
+    box.innerHTML = items.map((p, i) => `<div data-i="${i}" class="${i === hl ? "hl" : ""}">${esc(p.full_name)}<span>${esc(p.ioc || "")}</span></div>`).join("");
+    box.classList.toggle("show", items.length > 0);
+  };
+  input.addEventListener("input", () => {
+    picked[key] = null; clearTimeout(timer);
+    timer = setTimeout(async () => {
+      try { items = await api(`/api/search?tour=${$("m-tour").value}&q=${encodeURIComponent(input.value)}`); } catch (e) { items = []; }
+      hl = -1; draw();
+    }, 150);
+  });
+  input.addEventListener("keydown", (e) => {
+    if (!box.classList.contains("show")) return;
+    if (e.key === "ArrowDown") { hl = Math.min(hl + 1, items.length - 1); draw(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { hl = Math.max(hl - 1, 0); draw(); e.preventDefault(); }
+    else if (e.key === "Enter" && (hl >= 0 || items.length === 1)) { choose(items[Math.max(hl, 0)]); e.preventDefault(); }
+    else if (e.key === "Escape") close();
+  });
+  box.addEventListener("mousedown", (e) => { const d = e.target.closest("[data-i]"); if (d) { choose(items[+d.dataset.i]); e.preventDefault(); } });
+  input.addEventListener("blur", () => setTimeout(close, 120));
+}
+wirePicker("a"); wirePicker("b");
+$("m-tour").onchange = () => { picked.a = picked.b = null; $("m-a").value = $("m-b").value = ""; $("m-bo").value = "3"; };
+
+function sideCard(s, p) {
+  return `<div class="side"><div class="name">${esc(s.name)} ${s.vetoed ? '<span class="pill flag">Vetoed</span>' : ""}</div>
+    <div class="big">${pct(p)}</div>
+    <div class="meta">Fair price ${Math.round(p * 100)}¢. Rating ${int(s.elo)}, on this surface ${int(s.surface_elo)} (${int(s.surface_matches)} matches).<br>
+      Wins ${pct(s.serve_point_prob)} of points on serve. Last played ${esc(s.last_date || "–")}${s.vetoed ? `, lost by ${esc(s.last_outcome)}` : ""}.</div></div>`;
+}
+$("m-run").onclick = async () => {
+  const out = $("m-out");
+  if (!picked.a || !picked.b) { out.innerHTML = '<div class="empty">Choose both players from the suggestions first.</div>'; return; }
+  $("m-run").disabled = true; out.innerHTML = '<div class="empty">Simulating 10,000 matches…</div>';
+  try {
+    const r = await api("/api/simulate", { tour: $("m-tour").value, a: picked.a.player_id, b: picked.b.player_id,
+      surface: $("m-surface").value, best_of: +$("m-bo").value });
+    const scores = Object.entries(r.set_scores).sort((p, q) => {
+      const [pa, pb] = p[0].split("-").map(Number), [qa, qb] = q[0].split("-").map(Number);
+      return (qa - qb) - (pa - pb);
+    });
+    const maxScore = Math.max(...scores.map((s) => s[1])), maxGames = Math.max(...r.total_games.map((g) => g.prob));
+    out.innerHTML = `
+      <div class="versus">${sideCard(r.a, r.p_a)}${sideCard(r.b, r.p_b)}</div>
+      <div class="split" aria-hidden="true"><i style="width:${r.p_a * 100}%"></i></div>
+      <p class="hint">${int(r.trials)} simulated matches on ${esc(r.surface)}, best of ${r.best_of}. The win chance is accurate to about ±${(r.standard_error * 200).toFixed(1)} points.
+        ${esc(r.a.name)} wins the first set ${pct(r.p_a_first_set)} of the time. Average length ${r.mean_total_games.toFixed(1)} games.</p>
+      <div class="grid2">
+        <div><h2>Set score (${esc(r.a.name)} first)</h2><div class="bars">${scores.map(([k, v]) => {
+          const [sa, sb] = k.split("-").map(Number);
+          return `<div class="barrow"><span>${k}</span><span class="track"><i class="${sa > sb ? "" : "b"}" style="width:${v / maxScore * 100}%"></i></span><b>${pct(v)}</b></div>`; }).join("")}</div></div>
+        <div><h2>Total games</h2><div class="bars">${r.total_games.filter((g) => g.prob >= 0.005).map((g) =>
+          `<div class="barrow"><span>${g.games}</span><span class="track"><i style="width:${g.prob / maxGames * 100}%"></i></span><b>${pct(g.prob)}</b></div>`).join("")}</div></div>
+      </div>`;
+  } catch (e) { out.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  $("m-run").disabled = false;
+};
+
+/* ---------- players ---------- */
+let playerTimer = null;
+async function loadPlayers() {
+  const el = $("p-out");
+  let rows;
+  try { rows = await api(`/api/players?tour=${$("p-tour").value}&surface=${$("p-surface").value}&q=${encodeURIComponent($("p-q").value)}`); }
+  catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  el.innerHTML = table([
+    { key: "position", title: "#", left: true },
+    { title: "Player", left: true, html: (r) => `${esc(r.full_name)} ${r.vetoed ? '<span class="pill flag">Vetoed</span>' : ""}` },
+    { key: "ioc", title: "Country", left: true },
+    { key: "elo", title: "Rating", fmt: (v) => Math.round(v) },
+    { key: "matches_played", title: "Matches", fmt: int },
+    { key: "serve_pts_won", title: "Serve points won", fmt: pct },
+    { key: "return_pts_won", title: "Return points won", fmt: pct },
+    { key: "last_tourney_date", title: "Last played" },
+    { key: "last_outcome", title: "Last result", html: (r) => r.last_outcome === "COMPLETED" ? (r.last_match_won ? "Won" : "Lost")
+        : `${r.last_match_won ? "Won" : "Lost"} by ${esc(r.last_outcome)}` },
+  ], rows);
+}
+["p-tour", "p-surface"].forEach((id) => $(id).onchange = loadPlayers);
+$("p-q").oninput = () => { clearTimeout(playerTimer); playerTimer = setTimeout(loadPlayers, 200); };
+
+/* ---------- guardrails ---------- */
+async function loadGuardrails() {
+  const g = await api("/api/guardrails");
+  const rows = [
+    ["Combo hit probability", `At least ${pct(g.MIN_COMBO_HIT_PROB, 0)}`, "Every combo must have at least this chance to cash. There is no cap on legs."],
+    ["Leg edge", `At least +${pct(g.MIN_LEG_EDGE, 0)}`, "Simulated probability minus the Kalshi ask, for every leg."],
+    ["Combo edge", `At least +${pct(g.MIN_COMBO_EDGE, 0)}`, "Joint probability minus Kalshi's implied combo price."],
+    ["Name match confidence", `At least ${pct(g.MIN_NAME_MATCH_CONFIDENCE, 0)}`, "Below this, the player is not matched and the leg is vetoed."],
+    ["Last-match veto", g.VETO_LAST_RESULTS.join(", "), "A player who lost their last match by retirement or walkover is vetoed. The player who advanced is not."],
+    ["Playbook changes", `${g.MIN_SETTLED_LEGS_FOR_PLAYBOOK_CHANGE} settled legs`, "A heuristic can change only with this sample and a better Brier score."],
+    ["Brier ceiling", `Below ${g.MAX_BRIER_SCORE}`, "Blind 2025–2026 walk-forward, tour-level matches."],
+    ["Calibration", `Within ±${pct(g.MAX_CALIBRATION_GAP)}`, "Predicted against actual win rate in each of five probability buckets."],
+    ["Orders", "Never", "Read-only. Public market data and paper trades only."],
+  ].map(([rule, value, meaning]) => ({ rule, value, meaning }));
+  $("guardrails").innerHTML = `<p class="hint">Locked values, read from <code>src/risk_gate.py</code>. They mirror <code>vault/Hard_Guardrails.md</code> and cannot be changed here.</p>` +
+    table([{ key: "rule", title: "Rule", left: true }, { key: "value", title: "Value", left: true },
+           { title: "Meaning", left: true, html: (r) => `<span style="white-space:normal">${esc(r.meaning)}</span>` }], rows);
+}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll("[role=tab]").forEach((tab) => tab.onclick = () => {
+  document.querySelectorAll("[role=tab]").forEach((t) => t.setAttribute("aria-selected", t === tab));
+  document.querySelectorAll("[role=tabpanel]").forEach((p) => p.classList.toggle("on", p.id === tab.dataset.tab));
+});
+
+loadGuardrails();
+refreshStatus();
+setInterval(refreshStatus, 1500);
+</script>
+</body>
+</html>

@@ -7,3 +7,4 @@ data/*.sqlite*
 vault/.obsidian/workspace*.json
 
 data/raw/
+.venv/

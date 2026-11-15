@@ -104,7 +104,7 @@ def _num(value):
 
 def walk_forward(matches: pd.DataFrame, params: ModelParams, engine: str = "analytic",
                  sim_seasons=TEST_SEASONS, sim_tiers=("tour",), n_trials: int = sim.DEFAULT_TRIALS,
-                 progress: bool = False) -> tuple[pd.DataFrame, RatingModel]:
+                 progress=False) -> tuple[pd.DataFrame, RatingModel]:
     """Predict then update, one match at a time, in chronological order.
 
     `matches` must already be sorted chronologically. Walkovers are not predicted,
@@ -149,7 +149,9 @@ def walk_forward(matches: pd.DataFrame, params: ModelParams, engine: str = "anal
                 )
                 p_a = result.p_a_win
                 n_simulated += 1
-                if progress and n_simulated % 1000 == 0:
+                if callable(progress):
+                    progress(n_simulated)
+                elif progress and n_simulated % 1000 == 0:
                     print(f"    simulated {n_simulated:,} matches", flush=True)
             else:
                 p_a = bo3_to_bo5(p3) if r.best_of == 5 else p3
@@ -170,6 +172,9 @@ def walk_forward(matches: pd.DataFrame, params: ModelParams, engine: str = "anal
             l_svpt if has_stats else None, (l_first + l_second) if has_stats else None,
         )
 
+    if len(fit_y) >= MIN_FIT_ROWS:
+        betas = fit_betas(np.array(fit_x), np.array(fit_y))   # weights for predicting matches still to come
+    model.betas = betas
     preds = pd.DataFrame(out, columns=["match_id", "season", "tier", "surface", "best_of", "outcome",
                                        "p_winner", "engine"])
     return preds, model
@@ -264,7 +269,7 @@ def write_post_mortem(path: Path, run_id: str, engine: str, headline: pd.DataFra
 
 
 def run(db_path: Path = DEFAULT_DB, engine: str = "sim", tune: bool = False, n_trials: int = sim.DEFAULT_TRIALS,
-        write_vault: bool = True) -> dict:
+        write_vault: bool = True, progress=True) -> dict:
     with sqlite3.connect(db_path) as conn:
         init_db(conn)
         if tune:
@@ -284,7 +289,10 @@ def run(db_path: Path = DEFAULT_DB, engine: str = "sim", tune: bool = False, n_t
         for tour in ("ATP", "WTA"):
             print(f"Walk-forward {tour} ({engine})...", flush=True)
             matches = load_matches(conn, tour)
-            preds, model = walk_forward(matches, params[tour], engine=engine, n_trials=n_trials, progress=True)
+            done_before = sum(int((f["engine"] == "sim").sum()) for f in frames)
+            tour_progress = (lambda n, base=done_before: progress(base + n)) if callable(progress) else progress
+            preds, model = walk_forward(matches, params[tour], engine=engine, n_trials=n_trials,
+                                        progress=tour_progress)
             preds.insert(1, "tour", tour)
             frames.append(preds)
             write_snapshot(conn, tour, model, as_of)
@@ -292,6 +300,8 @@ def run(db_path: Path = DEFAULT_DB, engine: str = "sim", tune: bool = False, n_t
 
         test = preds[preds["season"].isin(TEST_SEASONS)]
         headline_set = test[test["tier"] == "tour"]
+        if headline_set.empty:
+            raise RuntimeError("No tour-level 2025-2026 matches in the database. Run the ingest first.")
         brier = brier_score(headline_set["p_winner"])
         gap = max_calibration_gap(headline_set["p_winner"])
         passed = milestone1_gate_passed(brier, gap)

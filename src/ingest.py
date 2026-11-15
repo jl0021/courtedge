@@ -5,7 +5,7 @@ tennis data, CC BY-NC-SA 4.0). The upstream JeffSackmann/tennis_atp repository
 returns 404 and must not be used.
 
 Usage:
-    python -m src.ingest                       # clones the archive into data/raw/ if missing
+    python -m src.ingest                       # downloads the needed files into data/raw/ if missing
     python -m src.ingest --archive /path/to/tennis-sackmann-archive
 """
 
@@ -17,6 +17,7 @@ import re
 import sqlite3
 import subprocess
 import unicodedata
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = REPO_ROOT / "data" / "courtedge.db"
 DEFAULT_ARCHIVE = REPO_ROOT / "data" / "raw" / "tennis-sackmann-archive"
 ARCHIVE_URL = "https://github.com/Aneeshers/tennis-sackmann-archive"
+ARCHIVE_RAW_URL = "https://raw.githubusercontent.com/Aneeshers/tennis-sackmann-archive/main"
 FORBIDDEN_SOURCES = ("JeffSackmann/tennis_atp",)
 
 SEASONS = (2024, 2025, 2026)
@@ -271,12 +273,61 @@ def normalize_surface(surface) -> str:
     return text if text in ("Hard", "Clay", "Grass", "Carpet") else "Unknown"
 
 
-def ensure_archive(archive: Path) -> Path:
-    """Clone the atp/ and wta/ folders of the archive if they are not on disk."""
+def required_files(seasons=SEASONS, tours=TOURS) -> list[str]:
+    """Archive-relative paths of every file the ingest reads (about 26 MB in total)."""
+    files = []
+    for tour in tours:
+        folder = tour.lower()
+        for pattern, _tier in SOURCE_FILES[tour]:
+            files += [f"{folder}/{pattern.format(year=season)}" for season in seasons]
+        files.append(f"{folder}/{folder}_players.csv")
+    return files
+
+
+def download_archive_files(archive: Path, seasons=SEASONS, force: bool = False, log=print) -> int:
+    """Download only the needed CSV files from the archive. Returns how many were fetched."""
+    fetched = 0
+    for rel in required_files(seasons):
+        target = archive / rel
+        if target.exists() and not force:
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        log(f"Downloading {rel}")
+        partial = target.with_suffix(".part")
+        with urllib.request.urlopen(f"{ARCHIVE_RAW_URL}/{rel}", timeout=60) as response:
+            partial.write_bytes(response.read())
+        partial.replace(target)
+        fetched += 1
+    return fetched
+
+
+def ensure_archive(archive: Path, seasons=SEASONS, force_download: bool = False, log=print) -> Path:
+    """Make sure the needed archive files are on disk.
+
+    The default location (data/raw/) is managed: missing files are downloaded, and
+    if direct downloads are blocked the archive is cloned with git instead. Any other
+    path is treated as a copy the caller already has and is used as it is.
+    """
     if any(bad.lower() in str(archive).lower() for bad in ("jeffsackmann",)):
         raise ValueError("JeffSackmann upstream repositories must not be used as a source")
-    if (archive / "atp").is_dir() and (archive / "wta").is_dir():
+    if archive.resolve() != DEFAULT_ARCHIVE.resolve():
+        if not (archive / "atp").is_dir() or not (archive / "wta").is_dir():
+            raise FileNotFoundError(f"{archive} does not contain atp/ and wta/ folders")
         return archive
+
+    have_all = all((archive / rel).exists() for rel in required_files(seasons))
+    if have_all and not force_download:
+        return archive
+    try:
+        download_archive_files(archive, seasons, force=force_download, log=log)
+        return archive
+    except OSError as exc:
+        if have_all:
+            log(f"Could not refresh the archive ({exc}). Using the files already on disk.")
+            return archive
+        if archive.exists() and any(archive.iterdir()):
+            raise
+        log(f"Direct download failed ({exc}). Cloning the archive with git instead.")
     archive.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         ["git", "clone", "--depth", "1", "--filter=blob:none", "--sparse", ARCHIVE_URL, str(archive)],
@@ -395,8 +446,9 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def ingest(archive: Path = DEFAULT_ARCHIVE, db_path: Path = DEFAULT_DB, seasons=SEASONS) -> dict:
-    archive = ensure_archive(Path(archive))
+def ingest(archive: Path = DEFAULT_ARCHIVE, db_path: Path = DEFAULT_DB, seasons=SEASONS,
+           force_download: bool = False, log=print) -> dict:
+    archive = ensure_archive(Path(archive), seasons, force_download=force_download, log=log)
     matches = load_matches(archive, seasons)
     players = load_players(archive, matches)
     lookup = build_player_lookup(players)
