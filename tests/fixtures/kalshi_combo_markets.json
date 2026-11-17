@@ -1,0 +1,28 @@
+{
+ "cursor": "",
+ "markets": [
+  {
+   "ticker": "KXMVESPORTSMULTIGAMEEXTENDED-S2026TEST-0001",
+   "event_ticker": "KXMVESPORTSMULTIGAMEEXTENDED-S2026TEST",
+   "mve_collection_ticker": "KXMVESPORTSMULTIGAMEEXTENDED-R",
+   "market_type": "binary",
+   "status": "active",
+   "result": "",
+   "mve_selected_legs": [
+    {
+     "event_ticker": "KXATPMATCH-26NOV17ZVESHE",
+     "market_ticker": "KXATPMATCH-26NOV17ZVESHE-ZVE",
+     "side": "yes"
+    },
+    {
+     "event_ticker": "KXATPMATCH-26NOV17FILJOD",
+     "market_ticker": "KXATPMATCH-26NOV17FILJOD-JOD",
+     "side": "yes"
+    }
+   ],
+   "yes_ask_dollars": "0.3150",
+   "yes_ask_size_fp": "50.00",
+   "title": "yes Alexander Zverev,yes Rafael Jodar"
+  }
+ ]
+}

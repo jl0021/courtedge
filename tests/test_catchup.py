@@ -23,8 +23,9 @@ def competition(comp_id, date, winner, loser, sets, status="STATUS_FINAL", round
             "round": {"displayName": round_name}, "competitors": [side(loser, False, 1), side(winner, True, 0)]}
 
 
-def scoreboard(*competitions, name="Test Open", city="Testville, Nowhere", slug="mens-singles", major=False):
-    return {"events": [{"id": "77", "name": name, "major": major, "venue": {"displayName": city},
+def scoreboard(*competitions, name="Test Open", city="Testville, Nowhere", slug="mens-singles", major=False,
+               start="2024-01-01"):
+    return {"events": [{"id": "77", "name": name, "major": major, "venue": {"displayName": city}, "date": f"{start}T05:00Z",
                         "groupings": [{"grouping": {"slug": slug}, "competitions": list(competitions)}]}]}
 
 
@@ -130,8 +131,21 @@ def test_catch_up_is_idempotent(caught_up, feed):
     assert again["added"] == 0 and again["already_stored"] == 2
     assert conn.execute("SELECT COUNT(*) FROM matches WHERE source = 'espn'").fetchone()[0] == 2
     assert conn.execute("SELECT COUNT(*) FROM ingest_unmatched").fetchone()[0] == 1
-    # The second run only asks for the days around the last stored result.
-    assert min(start for _, start, _ in feed.calls[-2:]) == dt.date(2024, 1, 27)
+    # The second run looks back three weeks from the last stored result, to catch long events.
+    assert min(start for _, start, _ in feed.calls[-8:]) == dt.date(2024, 1, 9)
+
+
+def test_a_new_alias_recovers_previously_skipped_matches(caught_up, feed, archive, monkeypatch):  # noqa: F811
+    conn, path, _ = caught_up
+    assert conn.execute("SELECT COUNT(*) FROM ingest_unmatched").fetchone()[0] == 1          # "Jon Smith"
+    monkeypatch.setattr(ingest, "load_manual_aliases", lambda path=None: {"ATP": {"Jon Smith": "John Smith"}})
+    monkeypatch.setattr(ingest, "CATCHUP_LOOKBACK_DAYS", 3)      # so only the rewind can reach the skipped date
+    ingest.ingest(archive, path, log=lambda message: None)
+    before = len(feed.calls)
+    again = ingest.catch_up(path, today=TODAY, fetch=feed, log=lambda message: None)
+    assert again["added"] == 1 and again["unmatched"] == 0
+    assert min(start for _, start, _ in feed.calls[before:]) == dt.date(2024, 1, 21)   # went back to the skipped date
+    assert conn.execute("SELECT COUNT(*) FROM ingest_unmatched").fetchone()[0] == 0
 
 
 def test_seed_reload_keeps_catch_up_rows(caught_up, archive):  # noqa: F811
@@ -204,6 +218,30 @@ def test_a_failed_week_stops_the_run_so_no_gap_is_left(db, feed, monkeypatch):  
     assert summary["errors"] == ["2024-01-22 to 2024-01-28: timed out"]
     # The later week was never stored, so the next run starts again from the gap.
     assert conn.execute("SELECT MAX(tourney_date) FROM matches WHERE source = 'espn'").fetchone()[0] == "2024-01-20"
+
+
+def test_second_week_of_a_long_event_is_not_missed(db, monkeypatch):  # noqa: F811
+    """ESPN only returns an event when the requested range includes its first day. Mimic that."""
+    conn, _ = db
+    path = Path(conn.execute("PRAGMA database_list").fetchone()[2])
+    monkeypatch.setattr(ingest, "CATCHUP_START", dt.date(2024, 1, 14))
+    slam_start = dt.date(2024, 1, 14)
+    played = [competition(9002, "2024-01-15", "Jannik Sinner", "Jan Smith", [(6, 4), (6, 4), (6, 4)])]
+
+    def espn_like(league, start, end):
+        if league != "atp" or not (start <= slam_start <= end):
+            return {"events": []}
+        return scoreboard(*played, name="Big Slam", major=True, start=slam_start.isoformat())
+
+    log = lambda message: None
+    first = ingest.catch_up(path, today=dt.date(2024, 1, 15), fetch=espn_like, log=log)
+    assert first["added"] == 1
+    played.append(competition(9004, "2024-01-27", "Carlos Alcaraz", "Felix Auger-Aliassime",
+                              [(6, 3), (6, 3), (6, 3)], round_name="Final"))
+    later = ingest.catch_up(path, today=dt.date(2024, 1, 28), fetch=espn_like, log=log)
+    assert later["added"] == 1 and later["already_stored"] == 1      # the final, 13 days after the start
+    assert conn.execute("SELECT best_of FROM matches WHERE match_id = ?",
+                        (espn_feed.MATCH_ID_OFFSET + 9004,)).fetchone()[0] == 5
 
 
 def test_old_database_gains_the_new_columns(tmp_path):

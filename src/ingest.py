@@ -44,6 +44,10 @@ ALIASES_PATH = REPO_ROOT / "config" / "name_aliases.json"
 # The catch-up asks the live feed for everything from this date and drops what the archive already has.
 CATCHUP_START = dt.date(2026, 5, 25)
 CATCHUP_CHUNK_DAYS = 7
+# ESPN returns an event only when the requested dates include the event's first day, and the
+# event then carries all of its matches. Looking back three weeks keeps a two-week Grand Slam
+# plus qualifying in view until it ends. Results already stored are skipped, so this is cheap.
+CATCHUP_LOOKBACK_DAYS = 21
 DUPLICATE_WINDOW_DAYS = 21
 FATIGUE_WINDOW_DAYS = 7
 
@@ -662,7 +666,14 @@ def catch_up(db_path: Path = DEFAULT_DB, today: dt.date | None = None, fetch=esp
     with sqlite3.connect(db_path) as conn:
         init_db(conn)
         last = conn.execute("SELECT MAX(tourney_date) FROM matches WHERE source = 'espn'").fetchone()[0]
-        start = max(CATCHUP_START, dt.date.fromisoformat(last) - dt.timedelta(days=3)) if last else CATCHUP_START
+        start = (max(CATCHUP_START, dt.date.fromisoformat(last) - dt.timedelta(days=CATCHUP_LOOKBACK_DAYS))
+                 if last else CATCHUP_START)
+        # Names skipped earlier that now resolve (for example after adding an alias): go back and fetch them.
+        if "match_date" in {row[1] for row in conn.execute("PRAGMA table_info(ingest_unmatched)")}:
+            for tour, name, first in conn.execute(
+                    "SELECT tour, name, MIN(match_date) FROM ingest_unmatched GROUP BY tour, name").fetchall():
+                if resolve_player(conn, name, tour) is not None:
+                    start = max(CATCHUP_START, min(start, dt.date.fromisoformat(first)))
 
         found: dict[int, espn_feed.EspnMatch] = {}
         day = start

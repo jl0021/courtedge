@@ -120,6 +120,7 @@
     <button role="tab" aria-selected="true" data-tab="performance">Performance</button>
     <button role="tab" aria-selected="false" data-tab="matchup">Matchup simulator</button>
     <button role="tab" aria-selected="false" data-tab="players">Players</button>
+    <button role="tab" aria-selected="false" data-tab="slate">Live slate</button>
     <button role="tab" aria-selected="false" data-tab="guardrails">Guardrails</button>
   </nav>
 
@@ -149,6 +150,14 @@
       their last match by retirement or walkover, which blocks them from any combo. "Last 7 days" is the workload
       up to today.</p>
     <div id="p-out"></div>
+  </section>
+
+  <section role="tabpanel" id="slate">
+    <div class="controls">
+      <button id="btn-scan" class="primary" title="Read open Kalshi tennis markets (GET only), price every leg, build combos and paper-log the best">Scan Kalshi</button>
+      <button id="btn-settle" title="Grade open paper trades from Kalshi's settled markets">Settle paper trades</button>
+    </div>
+    <div id="s-out"><div class="empty">Loading…</div></div>
   </section>
 
   <section role="tabpanel" id="guardrails"></section>
@@ -213,7 +222,9 @@ async function refreshStatus() {
   } else note.style.display = "none";
   const bar = $("jobbar");
   const running = job.state === "running";
-  ["btn-update", "btn-fast", "btn-full"].forEach((id) => $(id).disabled = running);
+  ["btn-update", "btn-fast", "btn-full", "btn-scan", "btn-settle"].forEach((id) => $(id).disabled = running);
+  if (lastJobName && lastJobState === "running" && job.state !== "running" && ["scan", "settle"].includes(lastJobName)) loadSlate();
+  lastJobName = job.name;
   bar.classList.toggle("show", running || job.state === "error");
   bar.classList.toggle("error", job.state === "error");
   if (running) $("jobmsg").textContent = `${job.message}… (${Math.round(job.elapsed || 0)}s)`;
@@ -222,7 +233,7 @@ async function refreshStatus() {
   const runId = s.run ? s.run.run_id : null;
   if (runId !== lastRunId || (lastJobState === "running" && job.state === "done")) {
     lastRunId = runId;
-    loadPerformance(); loadPlayers();
+    loadPerformance(); loadPlayers(); loadSlate();
   }
   lastJobState = job.state;
 }
@@ -354,7 +365,8 @@ $("m-run").onclick = async () => {
         <div><h2>Set score (${esc(r.a.name)} first)</h2><div class="bars">${scores.map(([k, v]) => {
           const [sa, sb] = k.split("-").map(Number);
           return `<div class="barrow"><span>${k}</span><span class="track"><i class="${sa > sb ? "" : "b"}" style="width:${v / maxScore * 100}%"></i></span><b>${pct(v)}</b></div>`; }).join("")}</div></div>
-        <div><h2>Total games</h2><div class="bars">${r.total_games.filter((g) => g.prob >= 0.005).map((g) =>
+        <div><h2>Total games</h2><p class="hint" style="color:var(--warn)">Not reliable: on 2025–2026 matches these
+          ran about 2 games too long, so total-games legs are never traded.</p><div class="bars">${r.total_games.filter((g) => g.prob >= 0.005).map((g) =>
           `<div class="barrow"><span>${g.games}</span><span class="track"><i style="width:${g.prob / maxGames * 100}%"></i></span><b>${pct(g.prob)}</b></div>`).join("")}</div></div>
       </div>`;
   } catch (e) { out.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
@@ -409,6 +421,69 @@ document.querySelectorAll("[role=tab]").forEach((tab) => tab.onclick = () => {
   document.querySelectorAll("[role=tab]").forEach((t) => t.setAttribute("aria-selected", t === tab));
   document.querySelectorAll("[role=tabpanel]").forEach((p) => p.classList.toggle("on", p.id === tab.dataset.tab));
 });
+
+/* ---------- live slate ---------- */
+const money = (v) => (v < 0 ? "−$" : "$") + Math.abs(v).toFixed(2);
+const edgeTxt = (v) => v == null ? "–" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}`;
+const legName = (l) => l.kind === "winner" ? esc(l.player_name || l.player) + " to win"
+  : `${esc(l.label)} <span class="hint">${esc(l.player)} v ${esc(l.opponent)}</span>`;
+const when = (iso) => iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "–";
+let lastJobName = null;
+
+async function loadSlate() {
+  const el = $("s-out");
+  let d;
+  try { d = await api("/api/slate"); } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const b = d.bankroll, scan = d.scan;
+  const gateNote = d.gate.open ? "" : `<p class="hint" style="color:var(--bad)">Scanning is off: ${esc(d.gate.reason)}</p>`;
+  $("btn-scan").disabled = !d.gate.open || $("btn-update").disabled;
+  let html = gateNote + `<div class="cards">
+    <div class="card"><div class="label">Paper bankroll</div><div class="value">${money(b.balance)}</div>
+      <div class="note">Started at ${money(b.start)}. ${money(b.available)} free, ${money(b.at_risk)} at risk.</div></div>
+    <div class="card"><div class="label">Settled combos</div><div class="value">${b.won}–${b.lost}</div>
+      <div class="note">Won–lost, ${b.void} void, ${b.open} open. Profit ${money(b.profit)}.</div></div>
+    <div class="card"><div class="label">Last scan</div><div class="value" style="font-size:20px">${scan ? when(scan.created_at) : "Never"}</div>
+      <div class="note">${scan ? `${scan.counts.matches} matches, ${scan.counts.qualifying_legs} of ${scan.counts.legs} legs qualify, ${scan.counts.combos_approved} combos pass.` : "Press Scan Kalshi."}</div></div>
+  </div>`;
+  if (scan) {
+    (scan.warnings || []).forEach((w) => { html += `<p class="hint" style="color:var(--warn)">${esc(w)}</p>`; });
+    const approved = scan.combos.filter((c) => c.approved);
+    html += `<h2>Combos that pass the gate</h2><p class="hint">Hit chance is the model's chance every leg wins. Price is Kalshi's own combo
+      market when one exists, otherwise the product of the legs' asks, which is only an estimate: a real combo quote is usually worse.</p>`;
+    html += approved.length ? table([
+      { title: "Legs", left: true, html: (c) => `<span style="white-space:normal">${c.legs.map(legName).join("<br>")}</span>` },
+      { key: "fair_combo_prob", title: "Hit chance", fmt: pct },
+      { title: "Price", html: (c) => `${pct(c.price)}<br><span class="hint">${c.price_source === "kalshi_combo" ? "Kalshi combo" : "leg product"}</span>` },
+      { title: "Edge", html: (c) => edgeTxt(c.edge) },
+      { title: "Paper", html: (c) => c.logged ? '<span class="pill pass">Logged</span>' : "" },
+    ], approved) : '<div class="empty">No combo passed the gate in the last scan.</div>';
+    html += `<h2>Legs</h2><p class="hint">Only legs on matches Kalshi lists as not started can qualify. ${d.totals_enabled ? "" :
+      "Total-games legs are shown for reference but never used: " + esc(d.totals_reason) + "."}</p>`;
+    html += table([
+      { title: "Leg", left: true, html: (l) => legName(l) },
+      { title: "Event", left: true, html: (l) => `${(l.tournament || "").startsWith(l.tour) ? "" : esc(l.tour) + " "}${esc(l.tournament || "")}<br><span class="hint">${esc(l.surface)}, best of ${l.best_of}, ${when(l.start_time)}</span>` },
+      { key: "simulated_prob", title: "Model", fmt: pct },
+      { key: "kalshi_ask", title: "Ask", fmt: (v) => pct(v, 0) },
+      { title: "Edge", html: (l) => edgeTxt(l.edge) },
+      { title: "Status", left: true, html: (l) => l.qualifies ? '<span class="pill pass">Qualifies</span>'
+          : `<span class="hint" style="white-space:normal">${esc(l.reasons.join("; "))}</span>` },
+    ], scan.legs);
+  }
+  html += `<h2>Paper ledger</h2>`;
+  html += d.ledger.length ? table([
+    { key: "combo_id", title: "#", left: true },
+    { key: "slate_date", title: "Logged", left: true },
+    { title: "Legs", left: true, html: (c) => `<span style="white-space:normal">${c.legs.map((l) =>
+        `${esc(l.label)}${l.result ? ` <span class="pill ${l.result === "yes" ? "pass" : l.result === "no" ? "fail" : "flag"}">${esc(l.result)}</span>` : ""}`).join("<br>")}</span>` },
+    { key: "fair_combo_prob", title: "Hit chance", fmt: pct },
+    { key: "kalshi_combo_price", title: "Price", fmt: pct },
+    { key: "stake_usd", title: "Stake", fmt: money },
+    { title: "Result", html: (c) => c.status === "open" ? "Open" : `${esc(c.status[0].toUpperCase() + c.status.slice(1))}<br><span class="hint">paid ${money(c.payout_usd)}</span>` },
+  ], d.ledger) : '<div class="empty">No paper trades yet.</div>';
+  el.innerHTML = html;
+}
+$("btn-scan").onclick = () => startJob("scan");
+$("btn-settle").onclick = () => startJob("settle");
 
 loadGuardrails();
 refreshStatus();

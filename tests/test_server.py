@@ -125,8 +125,3 @@ def test_http_routes(app, base_url):
     assert send(base_url + "/api/jobs/place-order", {})[0] == 404
     with pytest.raises(urllib.error.HTTPError):
         get(base_url + "/api/nope")
-
-
-def test_server_never_contacts_kalshi():
-    source = "".join(p.read_text() for p in (server.WEB_DIR.parent).glob("*.py")) + (server.WEB_DIR / "index.html").read_text()
-    assert "kalshi.com" not in source.lower() and "elections.kalshi" not in source.lower()

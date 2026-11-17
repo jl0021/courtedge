@@ -1,0 +1,38 @@
+{
+ "cursor": "",
+ "milestones": [
+  {
+   "category": "Sports",
+   "details": {
+    "best_of": "3",
+    "first_competitor_id": "527915ea-e368-4c7f-a203-c83ebb6f6572",
+    "gender": "men",
+    "main_game_event_ticker": "KXATPMATCH-26NOV17ALCMED",
+    "round": "Ivan Lendl Group",
+    "second_competitor_id": "d2257e62-3f76-4724-8a3f-745799aeae46",
+    "status": "not_started",
+    "tour": "ATP",
+    "tournament_name": "ATP World Tour Finals Men Singles"
+   },
+   "id": "8914a470-e306-4382-a6bd-ea4bbd5697fd",
+   "last_updated_ts": "2026-11-16T22:01:09.265992Z",
+   "notification_message": "The match is about to begin.",
+   "primary_event_tickers": [
+    "KXATPMATCH-26NOV17ALCMED",
+    "KXATPSETWINNER-26NOV17ALCMED-1",
+    "KXATPSETWINNER-26NOV17ALCMED-2",
+    "KXATPEXACTMATCH-26NOV17ALCMED"
+   ],
+   "related_event_tickers": [
+    "KXATPMATCH-26NOV17ALCMED",
+    "KXATPSETWINNER-26NOV17ALCMED-1",
+    "KXATPSETWINNER-26NOV17ALCMED-2",
+    "KXATPEXACTMATCH-26NOV17ALCMED"
+   ],
+   "source_id": "sr:sport_event:76736464",
+   "start_date": "2026-11-18T13:00:00Z",
+   "title": "Alcaraz vs Medvedev",
+   "type": "tennis_tournament_singles"
+  }
+ ]
+}

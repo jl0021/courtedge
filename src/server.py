@@ -23,10 +23,13 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 import pandas as pd
 
-from src import backtest, ingest, risk_gate, sim
+import datetime as dt
+
+from src import backtest, ingest, kalshi_reader, risk_gate, sim, slate, vault_writer
 from src.model import bo3_probability, serve_inputs
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
+VAULT_DIR = ingest.REPO_ROOT / "vault"
 DEFAULT_PORT = 8770
 SURFACES = ("Hard", "Clay", "Grass")
 ACTIVE_WINDOW_DAYS = 365
@@ -35,6 +38,8 @@ JOBS = {
     "setup": "Loading match data and running the backtest",
     "update": "Fetching new results and updating ratings",
     "startup": "Checking for new results",
+    "scan": "Scanning Kalshi",
+    "settle": "Settling paper trades",
     "backtest": "Running the fast backtest",
     "backtest-full": "Running the 10,000-trial simulator backtest",
 }
@@ -54,6 +59,9 @@ class App:
         self._performance_cache: tuple[str, dict] | None = None
         self.last_catch_up: dict | None = None
         self.fetch = None            # tests replace the live feed with a stub
+        self.kalshi_fetch = kalshi_reader.get_json
+        self.vault_dir = VAULT_DIR
+        self.last_settle: dict | None = None
 
     # ---- database helpers ----
     def connect(self) -> sqlite3.Connection:
@@ -102,6 +110,9 @@ class App:
 
     def _run_job(self, name: str) -> None:
         try:
+            if name in ("scan", "settle"):
+                self._run_trading_job(name)
+                return
             if name == "setup":
                 summary = ingest.ingest(self.archive, self.db_path, log=self._say)
                 self._say(f"Loaded {summary['matches']:,} archive matches. Fetching newer results")
@@ -134,6 +145,34 @@ class App:
         except Exception as exc:  # shown in the dashboard's error bar
             traceback.print_exc()
             self.job.update(state="error", message=f"{type(exc).__name__}: {exc}", finished=time.time())
+
+    def _run_trading_job(self, name: str) -> None:
+        """Settle open paper trades, then (for a scan) read Kalshi and log new ones. GET requests only."""
+        now = dt.datetime.now(dt.timezone.utc)
+        with self.connect() as conn:
+            slate.init_ledger(conn)
+            self._say("Settling open paper trades")
+            self.last_settle = slate.settle(conn, fetch=self.kalshi_fetch, now=now)
+            payload = None
+            if name == "scan":
+                gate = slate.gate_status(conn)
+                if not gate["open"]:
+                    raise slate.GateClosed(gate["reason"] + " Run a backtest first.")
+                self._say("Loading ratings")
+                models = self.models()
+                payload = slate.scan(conn, models, fetch=self.kalshi_fetch, now=now, log=self._say)
+            if self.write_vault:
+                self._say("Writing vault notes")
+                vault_writer.write_all(self.vault_dir, conn, payload, slate.local_date(now))
+        self.job.update(state="done", message="Finished", finished=time.time())
+
+    def slate_view(self) -> dict:
+        with self.connect() as conn:
+            slate.init_ledger(conn)
+            return {"scan": slate.latest_scan(conn), "gate": slate.gate_status(conn),
+                    "bankroll": slate.bankroll(conn), "ledger": slate.ledger(conn, limit=50),
+                    "last_settle": self.last_settle, "totals_enabled": slate.TOTALS_ENABLED,
+                    "totals_reason": slate.TOTALS_DISABLED_REASON}
 
     # ---- API payloads ----
     def status(self) -> dict:
@@ -328,6 +367,7 @@ def make_handler(app: App):
                 "/api/players": lambda: app.players(query.get("tour", "ATP"), query.get("surface", "All"),
                                                     query.get("q", "")),
                 "/api/search": lambda: app.search(query.get("tour", "ATP"), query.get("q", "")),
+                "/api/slate": app.slate_view,
             }
             if url.path in routes:
                 return self._guarded(lambda: self._json(routes[url.path]()))

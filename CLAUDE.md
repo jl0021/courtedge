@@ -28,3 +28,4 @@
 ## Verification & Workflow
 - Build and verify Milestone 1 (`ingest.py`, `sim.py`, `player_lookup`, `backtest.py`) first and confirm both gates on blind 2025–2026 walk-forward validation before wiring up live Kalshi market polling: a regression **Brier Score < 0.215**, and **calibration within ±3.5%** (predicted vs. actual win rate in each of the five favourite-probability buckets from 0.5 to 1.0).
 - Run `pytest` after every module change.
+- Total-games legs stay out of combos (`TOTALS_ENABLED = False` in `src/slate.py`) until the simulator's total-games probabilities pass a calibration check on archive matches. On 2025–2026 they ran about 2.3 games long per best-of-3 match and scored worse than a constant guess.

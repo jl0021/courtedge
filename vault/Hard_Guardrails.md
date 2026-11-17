@@ -30,6 +30,11 @@ The numeric values below are mirrored as constants in `src/risk_gate.py`, and
 
 There is no fixed ceiling on the number of legs. The 30% floor is what rules out moonshots.
 
+**Kalshi's implied combo price** (decided 2026-11-16): the Yes ask of Kalshi's own combo
+market with exactly these legs when one is open with an offer; otherwise the product of the
+legs' Yes asks. The product is an estimate, because a real combo quote is usually worse, so
+every combo records which price it used. Quotes are never requested.
+
 ## 3. Data sources and settlement
 
 | Parameter | Value | Meaning |
