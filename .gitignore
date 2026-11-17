@@ -8,3 +8,10 @@ vault/.obsidian/workspace*.json
 
 data/raw/
 .venv/
+
+# Notes the app generates on each machine (backtests, slates, player cards, results).
+# Hand-written notes such as Hard_Guardrails.md and Active_Playbook.md stay tracked.
+vault/Daily_Slates/
+vault/Players/
+vault/Winners/
+vault/Post_Mortems/
